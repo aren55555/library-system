@@ -1,0 +1,27 @@
+{
+  "name": "stacks-circulation",
+  "version": "3.4.1",
+  "private": true,
+  "description": "Circulation service for the Stacks library platform",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/server.ts",
+    "seed": "node src/db/seed.ts",
+    "job:nightly": "node src/jobs/run.ts",
+    "test": "node --test 'test/**/*.test.ts'",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.0.0",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.1.4",
+    "typescript": "^5.9.2"
+  }
+}
