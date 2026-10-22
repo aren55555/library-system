@@ -2,17 +2,39 @@
 
 Welcome, and thanks for taking the time to do this exercise with us.
 
-Stacks is a hosted system that small public libraries use to run their front desks. This repository is its circulation service: the part that handles checkouts, returns, renewals, holds (a patron's place in line for a book) and fines. It serves three member libraries in three time zones.
+Stacks is a hosted system that small public libraries use to run their front desks. This repository is its circulation service: the part that handles checkouts, returns, renewals, holds (a patron's place in line for a book) and fines. It serves three member libraries in three time zones: New York City, Honolulu and San Francisco.
 
 Patrons and library staff have reported some problems. They are in [TICKETS.md](TICKETS.md). The reports are written by patrons and desk staff, not engineers, so part of the job is working out what is actually wrong and what the right behavior should be. Your interviewer will tell you which ticket to start with and will act as the product owner if you have questions about how things should work.
 
 ## Setup
 
-You need Node.js 24 or newer.
+You need Node.js 26 or newer. Check with `node --version`. If it prints `v26` or higher, skip ahead to "Run it".
+
+### Installing Node.js 26
+
+**macOS.** Either download the macOS installer (`.pkg`) for v26 from <https://nodejs.org/en/download> and run it, or use nvm, a Node version manager:
+
+```sh
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash
+# Open a new terminal, then:
+nvm install 26
+```
+
+**Windows.** Download the Windows installer (`.msi`) for v26 from <https://nodejs.org/en/download>, run it with the default options, then open a new terminal. The commands in this README are written for a Unix-style shell (bash or zsh), so run them in Git Bash, which comes with [Git for Windows](https://git-scm.com/downloads/win). If you work in WSL (Windows Subsystem for Linux), follow the Linux steps inside WSL instead.
+
+**Linux.** Distribution packages are often older than v26, so use nvm:
+
+```sh
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash
+# Open a new terminal, then:
+nvm install 26
+```
+
+### Run it
 
 ```sh
 npm install
-npm test          # 30 tests, all passing
+npm test          # 32 tests, all passing
 npm start         # http://localhost:3000, seeds sample data on first run
 ```
 
@@ -23,7 +45,7 @@ npm start         # http://localhost:3000, seeds sample data on first run
 There is no UI. Requests identify the caller with headers.
 
 - **Patron app** routes (`/api/me/...`) need `X-Card-Number: <card number>`.
-- **Desk and admin** routes (`/api/desk/...`, `/api/admin/...`) need `X-Staff-Token: desk-dev-token` and `X-Branch: <CDF | PRH | KON>`, the branch the terminal is in.
+- **Desk and admin** routes (`/api/desk/...`, `/api/admin/...`) need `X-Staff-Token: desk-dev-token` and `X-Branch: <NYC | HNL | SFO>`, the branch the terminal is in.
 
 ```sh
 # Search the catalog
@@ -32,8 +54,8 @@ curl 'localhost:3000/api/catalog/search?q=salt+road'
 # A patron's account
 curl localhost:3000/api/me/account -H 'X-Card-Number: 21000101'
 
-# Check out and return at the Kona Coast desk
-DESK=(-H 'X-Staff-Token: desk-dev-token' -H 'X-Branch: KON' -H 'Content-Type: application/json')
+# Check out and return at the San Francisco desk
+DESK=(-H 'X-Staff-Token: desk-dev-token' -H 'X-Branch: SFO' -H 'Content-Type: application/json')
 curl "${DESK[@]}" -X POST localhost:3000/api/desk/checkout -d '{"cardNumber":"21000102","barcode":"39000001"}'
 curl "${DESK[@]}" -X POST localhost:3000/api/desk/return -d '{"barcode":"39000001"}'
 

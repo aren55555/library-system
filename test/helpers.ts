@@ -6,19 +6,19 @@ import { getBranchByCode } from '../src/patrons/repo.ts';
 import type { Ctx } from '../src/context.ts';
 import type { Branch, CardType, Format } from '../src/types.ts';
 
-export const STAFF = { 'x-staff-token': 'test-token', 'x-branch': 'CDF' };
+export const STAFF = { 'x-staff-token': 'test-token', 'x-branch': 'NYC' };
 
 export interface TestEnv {
   ctx: Ctx;
   clock: FixedClock;
   app: ReturnType<typeof createApp>;
-  cdf: Branch;
-  prh: Branch;
-  kon: Branch;
+  nyc: Branch;
+  hnl: Branch;
+  sfo: Branch;
 }
 
 // A fresh in-memory database with the three branches and nothing else.
-// The clock starts at 10:00am Pacific on a Tuesday.
+// The clock starts at 1:00pm Eastern (New York City) on a Tuesday.
 export function setup(start = '2026-03-03T18:00:00Z'): TestEnv {
   const config = { ...loadConfig({}), staffToken: 'test-token', emailLatencyMs: 0 };
   const clock = new FixedClock(start);
@@ -26,24 +26,24 @@ export function setup(start = '2026-03-03T18:00:00Z'): TestEnv {
   run(
     ctx.db,
     `INSERT INTO branches (id, code, name, timezone, opens_at, closes_at) VALUES
-     (1, 'CDF', 'Cedar Falls Library', 'America/Los_Angeles', '09:00', '20:00'),
-     (2, 'PRH', 'Prairie Hill Library', 'America/Chicago', '09:00', '21:00'),
-     (3, 'KON', 'Kona Coast Library', 'Pacific/Honolulu', '10:00', '18:00')`,
+     (1, 'NYC', 'New York City Library', 'America/New_York', '09:00', '20:00'),
+     (2, 'HNL', 'Honolulu Library', 'Pacific/Honolulu', '09:00', '21:00'),
+     (3, 'SFO', 'San Francisco Library', 'America/Los_Angeles', '10:00', '18:00')`,
   );
   return {
     ctx,
     clock,
     app: createApp(ctx, { quiet: true }),
-    cdf: getBranchByCode(ctx.db, 'CDF'),
-    prh: getBranchByCode(ctx.db, 'PRH'),
-    kon: getBranchByCode(ctx.db, 'KON'),
+    nyc: getBranchByCode(ctx.db, 'NYC'),
+    hnl: getBranchByCode(ctx.db, 'HNL'),
+    sfo: getBranchByCode(ctx.db, 'SFO'),
   };
 }
 
 let nextCard = 1000;
 let nextBarcode = 5000;
 
-export function addPatron(env: TestEnv, cardType: CardType = 'adult', branch = env.cdf) {
+export function addPatron(env: TestEnv, cardType: CardType = 'adult', branch = env.nyc) {
   const card = String(nextCard++);
   const { id } = run(
     env.ctx.db,
@@ -73,7 +73,7 @@ export function addTitle(
     'adult',
     options.cost ?? 25,
   );
-  const barcodes = (options.copies ?? [env.cdf]).map((branch) => {
+  const barcodes = (options.copies ?? [env.nyc]).map((branch) => {
     const barcode = String(nextBarcode++);
     run(
       env.ctx.db,

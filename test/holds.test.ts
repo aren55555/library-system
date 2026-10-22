@@ -14,7 +14,7 @@ test('a hold on a title that is on the shelf is ready right away', async () => {
   const env = setup();
   const book = addTitle(env);
 
-  const hold = await placeHold(env.ctx, addPatron(env).id, book.id, env.cdf.id);
+  const hold = await placeHold(env.ctx, addPatron(env).id, book.id, env.nyc.id);
 
   assert.equal(hold.status, 'ready');
   assert.equal(hold.expires_on, '2026-03-10');
@@ -25,14 +25,14 @@ test('a hold on a title that is on the shelf is ready right away', async () => {
 test('a returned copy goes to the first patron in line', async () => {
   const env = setup();
   const book = addTitle(env);
-  checkout(env.ctx, { cardNumber: addPatron(env).card, barcode: book.barcodes[0], branch: env.cdf });
+  checkout(env.ctx, { cardNumber: addPatron(env).card, barcode: book.barcodes[0], branch: env.nyc });
   const first = addPatron(env);
   const second = addPatron(env);
-  await placeHold(env.ctx, first.id, book.id, env.cdf.id);
+  await placeHold(env.ctx, first.id, book.id, env.nyc.id);
   env.clock.advanceMinutes(5);
-  await placeHold(env.ctx, second.id, book.id, env.cdf.id);
+  await placeHold(env.ctx, second.id, book.id, env.nyc.id);
 
-  const result = await returnCopy(env.ctx, book.barcodes[0], env.cdf);
+  const result = await returnCopy(env.ctx, book.barcodes[0], env.nyc);
 
   assert.equal(result.hold?.patron_id, first.id);
   assert.equal(copyStatus(env, book.barcodes[0]), 'on_hold_shelf');
@@ -43,13 +43,13 @@ test('only the patron the hold is for can check out a copy on the hold shelf', a
   const env = setup();
   const book = addTitle(env);
   const waiting = addPatron(env);
-  await placeHold(env.ctx, waiting.id, book.id, env.cdf.id);
+  await placeHold(env.ctx, waiting.id, book.id, env.nyc.id);
 
   assert.throws(
-    () => checkout(env.ctx, { cardNumber: addPatron(env).card, barcode: book.barcodes[0], branch: env.cdf }),
+    () => checkout(env.ctx, { cardNumber: addPatron(env).card, barcode: book.barcodes[0], branch: env.nyc }),
     { code: 'on_hold_for_another_patron' },
   );
-  const loan = checkout(env.ctx, { cardNumber: waiting.card, barcode: book.barcodes[0], branch: env.cdf });
+  const loan = checkout(env.ctx, { cardNumber: waiting.card, barcode: book.barcodes[0], branch: env.nyc });
   assert.equal(loan.patron_id, waiting.id);
   assert.equal(listHolds(env.ctx, waiting.id)[0].status, 'fulfilled');
 });
@@ -59,9 +59,9 @@ test('cancelling a ready hold passes the copy to the next patron', async () => {
   const book = addTitle(env);
   const first = addPatron(env);
   const second = addPatron(env);
-  const hold = await placeHold(env.ctx, first.id, book.id, env.cdf.id);
+  const hold = await placeHold(env.ctx, first.id, book.id, env.nyc.id);
   env.clock.advanceMinutes(1);
-  await placeHold(env.ctx, second.id, book.id, env.cdf.id);
+  await placeHold(env.ctx, second.id, book.id, env.nyc.id);
 
   await cancelHold(env.ctx, first.id, hold.id);
 
@@ -72,7 +72,7 @@ test('a patron cannot hold the same title twice', async () => {
   const env = setup();
   const book = addTitle(env);
   const patron = addPatron(env);
-  await placeHold(env.ctx, patron.id, book.id, env.cdf.id);
+  await placeHold(env.ctx, patron.id, book.id, env.nyc.id);
 
-  await assert.rejects(placeHold(env.ctx, patron.id, book.id, env.cdf.id), { code: 'duplicate_hold' });
+  await assert.rejects(placeHold(env.ctx, patron.id, book.id, env.nyc.id), { code: 'duplicate_hold' });
 });

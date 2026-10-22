@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS branches (
   id         INTEGER PRIMARY KEY,
   code       TEXT NOT NULL UNIQUE,
   name       TEXT NOT NULL,
-  timezone   TEXT NOT NULL,           -- IANA name, e.g. Pacific/Honolulu
+  timezone   TEXT NOT NULL,           -- IANA name, e.g. America/Los_Angeles
   opens_at   TEXT NOT NULL,           -- local HH:MM
   closes_at  TEXT NOT NULL            -- local HH:MM
 );

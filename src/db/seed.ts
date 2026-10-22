@@ -43,6 +43,10 @@ const NOUN = ['River', 'Garden', 'Kingdom', 'Orchard', 'Harbor', 'Library', 'Mou
 const KIDS = ['Bear', 'Bunny', 'Tugboat', 'Dragon', 'Moon', 'Duck', 'Robot', 'Kitten', 'Truck', 'Owl'];
 const AUTHOR_FIRST = ['Amelia', 'Bruno', 'Carmen', 'Dmitri', 'Esther', 'Farid', 'Greta', 'Hector', 'Ines', 'Jasper', 'Keiko', 'Luis', 'Mira', 'Nikolai', 'Odette'];
 
+// Added to the UTC hour of a Pacific local time to get the same local time at
+// each branch, by branch id.
+const UTC_SHIFT_FROM_PACIFIC: Record<number, number> = { 1: -3, 2: 3, 3: 0 };
+
 interface SeedSummary {
   branches: number;
   patrons: number;
@@ -60,22 +64,22 @@ export function seed(db: Db, now: Date): SeedSummary {
   db.exec('BEGIN');
   // Branches. Copies float between them, so a title's copies can be anywhere.
   run(db, `INSERT INTO branches (id, code, name, timezone, opens_at, closes_at) VALUES
-    (1, 'CDF', 'Cedar Falls Library', 'America/Los_Angeles', '09:00', '20:00'),
-    (2, 'PRH', 'Prairie Hill Library', 'America/Chicago', '09:00', '21:00'),
-    (3, 'KON', 'Kona Coast Library', 'Pacific/Honolulu', '10:00', '18:00')`);
+    (1, 'NYC', 'New York City Library', 'America/New_York', '09:00', '20:00'),
+    (2, 'HNL', 'Honolulu Library', 'Pacific/Honolulu', '09:00', '21:00'),
+    (3, 'SFO', 'San Francisco Library', 'America/Los_Angeles', '10:00', '18:00')`);
 
   // Patrons. 2100xxxx cards are the named patrons from support tickets.
   const insertPatron = db.prepare(
     'INSERT INTO patrons (card_number, name, email, card_type, home_branch_id, created_at) VALUES (?, ?, ?, ?, ?, ?)',
   );
   const named: [string, string, CardType, number][] = [
-    ['21000101', 'Leilani Kahananui', 'adult', 3],
-    ['21000102', 'Keoni Akana', 'senior', 3],
+    ['21000101', 'Sam Altman', 'adult', 3],
+    ['21000102', 'Rosa Chen', 'senior', 3],
     ['21000201', 'Tom Walker', 'adult', 1],
-    ['21000202', 'Daniel Reyes', 'adult', 1],
+    ['21000202', 'Zohran Mamdani', 'adult', 1],
     ['21000208', 'Priya Shah', 'adult', 1],
-    ['21000301', 'Grace Okafor', 'adult', 2],
-    ['21000303', 'Maya Okafor', 'child', 2],
+    ['21000301', 'Jason Momoa', 'adult', 2],
+    ['21000303', 'Maya Momoa', 'child', 2],
   ];
   for (const [card, name, type, branch] of named) {
     insertPatron.run(card, name, `${name.toLowerCase().replace(' ', '.')}@example.com`, type, branch, '2023-04-01T18:00:00.000Z');
@@ -168,13 +172,13 @@ export function seed(db: Db, now: Date): SeedSummary {
     const daysAgo = open ? between(0, 30) : between(31, 365);
     // Branch hours, roughly: checkouts happen during the local day.
     const out = new Date(now.getTime() - daysAgo * 86_400_000);
-    out.setUTCHours(between(17, 23) + (copy.branch_id === 3 ? 3 : copy.branch_id === 2 ? -2 : 0), between(0, 59));
+    out.setUTCHours(between(17, 23) + UTC_SHIFT_FROM_PACIFIC[copy.branch_id], between(0, 59));
     const due = addDays(toDateKey(out), LOAN_DAYS[copy.format]);
     let returned: string | null = null;
     if (!open) {
       const keptDays = Math.max(1, LOAN_DAYS[copy.format] + between(-12, rand() < 0.15 ? 9 : 0));
       const back = new Date(out.getTime() + keptDays * 86_400_000);
-      back.setUTCHours(between(17, 26) + (copy.branch_id === 3 ? 3 : 0), between(0, 59));
+      back.setUTCHours(between(17, 26) + UTC_SHIFT_FROM_PACIFIC[copy.branch_id], between(0, 59));
       returned = back.toISOString();
     }
     const id = Number(
@@ -236,9 +240,9 @@ function at(now: Date, daysAgo: number, utcTime: string): string {
 // Recreates what happened in the support tickets by running the real code.
 export async function seedStories(db: Db, now: Date): Promise<void> {
   const ctx = seedContext(db, now, 40);
-  const cdf = getBranchByCode(db, 'CDF');
-  const kon = getBranchByCode(db, 'KON');
-  const prh = getBranchByCode(db, 'PRH');
+  const nyc = getBranchByCode(db, 'NYC');
+  const sfo = getBranchByCode(db, 'SFO');
+  const hnl = getBranchByCode(db, 'HNL');
   const barcodeOf = (title: string, branchId: number) =>
     one<{ barcode: string }>(
       db,
@@ -247,51 +251,52 @@ export async function seedStories(db: Db, now: Date): Promise<void> {
       branchId,
     )!.barcode;
 
-  // Leilani checks out The Salt Road at Kona Coast at 11:05am, and returns it
-  // on the due date at 3:40pm, both local time.
-  const saltRoad = barcodeOf('The Salt Road', kon.id);
+  // Sam checks out The Salt Road in San Francisco at 2:05pm, and returns it
+  // after work on the due date at 6:40pm, both Pacific daylight time. In
+  // standard time both are an hour earlier, and the return is still after 4pm.
+  const saltRoad = barcodeOf('The Salt Road', sfo.id);
   ctx.clock.set(at(now, 30, '21:05:00'));
-  checkout(ctx, { cardNumber: '21000101', barcode: saltRoad, branch: kon });
+  checkout(ctx, { cardNumber: '21000101', barcode: saltRoad, branch: sfo });
   ctx.clock.set(at(now, 8, '01:40:00'));
-  await returnCopy(ctx, saltRoad, kon);
+  await returnCopy(ctx, saltRoad, sfo);
 
-  // Keoni, same branch, returns an item on its due date at 10:15am.
+  // Rosa, Sam's neighbor, returns an item on its due date at 11:15am.
   const saltRoad2 = one<{ barcode: string }>(
     db,
     "SELECT c.barcode FROM copies c JOIN titles t ON t.id = c.title_id WHERE t.title = 'The Salt Road' AND c.branch_id = ? ORDER BY c.id DESC LIMIT 1",
-    kon.id,
+    sfo.id,
   )!.barcode;
   ctx.clock.set(at(now, 26, '20:30:00'));
-  checkout(ctx, { cardNumber: '21000102', barcode: saltRoad2, branch: kon });
-  ctx.clock.set(at(now, 5, '20:15:00'));
-  await returnCopy(ctx, saltRoad2, kon);
+  checkout(ctx, { cardNumber: '21000102', barcode: saltRoad2, branch: sfo });
+  ctx.clock.set(at(now, 5, '18:15:00'));
+  await returnCopy(ctx, saltRoad2, sfo);
 
-  // Tom has the only copy of The Lighthouse Keeper's Daughter. Daniel places
-  // a hold. Tom returns it at Cedar Falls at 2:15pm; while the "your hold is
+  // Tom has the only copy of The Lighthouse Keeper's Daughter. Zohran places
+  // a hold. Tom returns it in New York City at 2:15pm; while the "your hold is
   // ready" email is going out, Priya checks the same copy out at self-checkout.
-  const lighthouse = barcodeOf("The Lighthouse Keeper's Daughter", cdf.id);
+  const lighthouse = barcodeOf("The Lighthouse Keeper's Daughter", nyc.id);
   ctx.clock.set(at(now, 20, '18:00:00'));
-  checkout(ctx, { cardNumber: '21000201', barcode: lighthouse, branch: cdf });
-  ctx.clock.set(at(now, 12, '04:30:00'));
+  checkout(ctx, { cardNumber: '21000201', barcode: lighthouse, branch: nyc });
+  ctx.clock.set(at(now, 12, '01:30:00'));
   const lighthouseTitle = one<{ id: number }>(db, "SELECT id FROM titles WHERE title = 'The Lighthouse Keeper''s Daughter'")!.id;
-  await placeHold(ctx, getPatronByCard(db, '21000202').id, lighthouseTitle, cdf.id);
-  ctx.clock.set(at(now, 3, '21:15:00'));
-  const returning = returnCopy(ctx, lighthouse, cdf);
+  await placeHold(ctx, getPatronByCard(db, '21000202').id, lighthouseTitle, nyc.id);
+  ctx.clock.set(at(now, 3, '18:15:00'));
+  const returning = returnCopy(ctx, lighthouse, nyc);
   await new Promise((resolve) => setTimeout(resolve, 10));
-  checkout(ctx, { cardNumber: '21000208', barcode: lighthouse, branch: cdf });
+  checkout(ctx, { cardNumber: '21000208', barcode: lighthouse, branch: nyc });
   await returning;
 
-  // Two Kona Coast patrons place holds on Pacific Tides Field Guide, which
+  // Two San Francisco patrons place holds on Pacific Tides Field Guide, which
   // pulls both copies off the shelf there.
   const tidesTitle = one<{ id: number }>(db, "SELECT id FROM titles WHERE title = 'Pacific Tides Field Guide'")!.id;
   ctx.clock.set(at(now, 1, '22:10:00'));
-  for (const id of patronsAt(db, kon.id, 2)) await placeHold(ctx, id, tidesTitle, kon.id);
+  for (const id of patronsAt(db, sfo.id, 2)) await placeHold(ctx, id, tidesTitle, sfo.id);
 
   // Maya (child card) has had Goodnight, Little Tugboat ($5.00) for months.
   // The nightly job has charged her 10 cents a day.
-  const tugboat = barcodeOf('Goodnight, Little Tugboat', prh.id);
+  const tugboat = barcodeOf('Goodnight, Little Tugboat', hnl.id);
   ctx.clock.set(at(now, 72, '19:00:00'));
-  checkout(ctx, { cardNumber: '21000303', barcode: tugboat, branch: prh });
+  checkout(ctx, { cardNumber: '21000303', barcode: tugboat, branch: hnl });
   const mayaLoan = one<Loan>(db, 'SELECT l.* FROM loans l JOIN copies c ON c.id = l.copy_id WHERE c.barcode = ?', tugboat)!;
   for (let daysAgo = 50; daysAgo >= 0; daysAgo--) {
     ctx.clock.set(at(now, daysAgo, '09:00:00'));

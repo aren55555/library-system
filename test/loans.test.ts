@@ -13,8 +13,8 @@ test('checkout sets the due date 21 days out for books and 7 for DVDs', () => {
   const book = addTitle(env);
   const dvd = addTitle(env, { format: 'dvd' });
 
-  const bookLoan = checkout(env.ctx, { cardNumber: patron.card, barcode: book.barcodes[0], branch: env.cdf });
-  const dvdLoan = checkout(env.ctx, { cardNumber: patron.card, barcode: dvd.barcodes[0], branch: env.cdf });
+  const bookLoan = checkout(env.ctx, { cardNumber: patron.card, barcode: book.barcodes[0], branch: env.nyc });
+  const dvdLoan = checkout(env.ctx, { cardNumber: patron.card, barcode: dvd.barcodes[0], branch: env.nyc });
 
   assert.equal(bookLoan.due_date, '2026-03-24');
   assert.equal(dvdLoan.due_date, '2026-03-10');
@@ -23,20 +23,20 @@ test('checkout sets the due date 21 days out for books and 7 for DVDs', () => {
 test('a copy cannot be checked out twice', () => {
   const env = setup();
   const book = addTitle(env);
-  checkout(env.ctx, { cardNumber: addPatron(env).card, barcode: book.barcodes[0], branch: env.cdf });
+  checkout(env.ctx, { cardNumber: addPatron(env).card, barcode: book.barcodes[0], branch: env.nyc });
 
   assert.throws(
-    () => checkout(env.ctx, { cardNumber: addPatron(env).card, barcode: book.barcodes[0], branch: env.cdf }),
+    () => checkout(env.ctx, { cardNumber: addPatron(env).card, barcode: book.barcodes[0], branch: env.nyc }),
     { code: 'copy_unavailable' },
   );
 });
 
 test('a copy must be checked out at the branch it is at', () => {
   const env = setup();
-  const book = addTitle(env, { copies: [env.prh] });
+  const book = addTitle(env, { copies: [env.hnl] });
 
   assert.throws(
-    () => checkout(env.ctx, { cardNumber: addPatron(env).card, barcode: book.barcodes[0], branch: env.cdf }),
+    () => checkout(env.ctx, { cardNumber: addPatron(env).card, barcode: book.barcodes[0], branch: env.nyc }),
     { code: 'wrong_branch' },
   );
 });
@@ -45,10 +45,10 @@ test('returning on time charges nothing', async () => {
   const env = setup();
   const patron = addPatron(env);
   const book = addTitle(env);
-  checkout(env.ctx, { cardNumber: patron.card, barcode: book.barcodes[0], branch: env.cdf });
+  checkout(env.ctx, { cardNumber: patron.card, barcode: book.barcodes[0], branch: env.nyc });
 
-  env.clock.set('2026-03-24T17:30:00Z'); // due date, 10:30am Pacific
-  const result = await returnCopy(env.ctx, book.barcodes[0], env.cdf);
+  env.clock.set('2026-03-24T17:30:00Z'); // due date, 1:30pm Eastern
+  const result = await returnCopy(env.ctx, book.barcodes[0], env.nyc);
 
   assert.deepEqual(result.finesCharged, []);
   assert.equal(getBalance(env.ctx, patron.id), 0);
@@ -58,10 +58,10 @@ test('returning late charges the daily fine for each day late', async () => {
   const env = setup();
   const patron = addPatron(env);
   const book = addTitle(env);
-  checkout(env.ctx, { cardNumber: patron.card, barcode: book.barcodes[0], branch: env.cdf });
+  checkout(env.ctx, { cardNumber: patron.card, barcode: book.barcodes[0], branch: env.nyc });
 
   env.clock.set('2026-03-27T18:00:00Z'); // three days after the due date
-  const result = await returnCopy(env.ctx, book.barcodes[0], env.cdf);
+  const result = await returnCopy(env.ctx, book.barcodes[0], env.nyc);
 
   assert.equal(result.finesCharged.length, 3);
   assert.equal(getBalance(env.ctx, patron.id), 0.75);
@@ -70,19 +70,19 @@ test('returning late charges the daily fine for each day late', async () => {
 test('a copy returned to another branch moves to that branch', async () => {
   const env = setup();
   const book = addTitle(env);
-  checkout(env.ctx, { cardNumber: addPatron(env).card, barcode: book.barcodes[0], branch: env.cdf });
+  checkout(env.ctx, { cardNumber: addPatron(env).card, barcode: book.barcodes[0], branch: env.nyc });
 
-  await returnCopy(env.ctx, book.barcodes[0], env.prh);
+  await returnCopy(env.ctx, book.barcodes[0], env.hnl);
 
-  const loan = checkout(env.ctx, { cardNumber: addPatron(env).card, barcode: book.barcodes[0], branch: env.prh });
-  assert.equal(loan.branch_id, env.prh.id);
+  const loan = checkout(env.ctx, { cardNumber: addPatron(env).card, barcode: book.barcodes[0], branch: env.hnl });
+  assert.equal(loan.branch_id, env.hnl.id);
 });
 
 test('renewing extends from the current due date', () => {
   const env = setup();
   const patron = addPatron(env);
   const book = addTitle(env);
-  const loan = checkout(env.ctx, { cardNumber: patron.card, barcode: book.barcodes[0], branch: env.cdf });
+  const loan = checkout(env.ctx, { cardNumber: patron.card, barcode: book.barcodes[0], branch: env.nyc });
 
   env.clock.set('2026-03-20T18:00:00Z');
   const renewed = renewLoan(env.ctx, patron.id, loan.id);
@@ -95,7 +95,7 @@ test('an overdue loan renews from today', () => {
   const env = setup();
   const patron = addPatron(env);
   const book = addTitle(env);
-  const loan = checkout(env.ctx, { cardNumber: patron.card, barcode: book.barcodes[0], branch: env.cdf });
+  const loan = checkout(env.ctx, { cardNumber: patron.card, barcode: book.barcodes[0], branch: env.nyc });
 
   env.clock.set('2026-03-30T18:00:00Z');
   assert.equal(renewLoan(env.ctx, patron.id, loan.id).due_date, '2026-04-20');
@@ -105,7 +105,7 @@ test('renewals are limited', () => {
   const env = setup();
   const patron = addPatron(env);
   const book = addTitle(env);
-  const loan = checkout(env.ctx, { cardNumber: patron.card, barcode: book.barcodes[0], branch: env.cdf });
+  const loan = checkout(env.ctx, { cardNumber: patron.card, barcode: book.barcodes[0], branch: env.nyc });
 
   renewLoan(env.ctx, patron.id, loan.id);
   renewLoan(env.ctx, patron.id, loan.id);
@@ -116,8 +116,8 @@ test('a loan cannot be renewed while someone is waiting for the title', async ()
   const env = setup();
   const patron = addPatron(env);
   const book = addTitle(env);
-  const loan = checkout(env.ctx, { cardNumber: patron.card, barcode: book.barcodes[0], branch: env.cdf });
-  await placeHold(env.ctx, addPatron(env).id, book.id, env.cdf.id);
+  const loan = checkout(env.ctx, { cardNumber: patron.card, barcode: book.barcodes[0], branch: env.nyc });
+  await placeHold(env.ctx, addPatron(env).id, book.id, env.nyc.id);
 
   assert.throws(() => renewLoan(env.ctx, patron.id, loan.id), { code: 'holds_waiting' });
 });

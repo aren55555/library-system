@@ -10,7 +10,7 @@ test('the nightly job charges overdue fines and catches up missed days', async (
   const env = setup();
   const patron = addPatron(env);
   const book = addTitle(env);
-  checkout(env.ctx, { cardNumber: patron.card, barcode: book.barcodes[0], branch: env.cdf });
+  checkout(env.ctx, { cardNumber: patron.card, barcode: book.barcodes[0], branch: env.nyc });
 
   env.clock.set('2026-03-26T09:00:00Z');
   const summary = await runNightly(env.ctx);
@@ -23,7 +23,7 @@ test('the nightly job sends one due-tomorrow reminder per patron', async () => {
   const env = setup();
   const patron = addPatron(env);
   for (const title of [addTitle(env), addTitle(env)]) {
-    checkout(env.ctx, { cardNumber: patron.card, barcode: title.barcodes[0], branch: env.cdf });
+    checkout(env.ctx, { cardNumber: patron.card, barcode: title.barcodes[0], branch: env.nyc });
   }
 
   env.clock.set('2026-03-23T09:00:00Z');
@@ -36,9 +36,9 @@ test('the nightly job expires ready holds and passes the copy on', async () => {
   const book = addTitle(env);
   const first = addPatron(env);
   const second = addPatron(env);
-  await placeHold(env.ctx, first.id, book.id, env.cdf.id);
+  await placeHold(env.ctx, first.id, book.id, env.nyc.id);
   env.clock.advanceMinutes(1);
-  await placeHold(env.ctx, second.id, book.id, env.cdf.id);
+  await placeHold(env.ctx, second.id, book.id, env.nyc.id);
 
   env.clock.set('2026-03-11T09:00:00Z');
   const summary = await runNightly(env.ctx);

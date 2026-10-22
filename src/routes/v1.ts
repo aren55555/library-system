@@ -2,8 +2,8 @@ import { Router } from 'express';
 import { all } from '../db/connection.ts';
 import type { Ctx } from '../context.ts';
 
-// DEPRECATED: v1 search, still used by the self-service kiosks at the Cedar
-// Falls branch. Do not add features here. Remove once the kiosks are on v2.
+// DEPRECATED: v1 search, still used by the self-service kiosks at the New
+// York City branch. Do not add features here. Remove once the kiosks are on v2.
 export function v1Router(ctx: Ctx): Router {
   const router = Router();
 

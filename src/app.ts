@@ -5,6 +5,7 @@ import { openDb, type Db } from './db/connection.ts';
 import { createOutbox } from './notify/outbox.ts';
 import { errorHandler } from './middleware/errors.ts';
 import { requestLog } from './middleware/requestLog.ts';
+import { sameOriginOnly } from './middleware/sameOrigin.ts';
 import { adminRouter } from './routes/admin.ts';
 import { catalogRouter } from './routes/catalog.ts';
 import { deskRouter } from './routes/desk.ts';
@@ -29,6 +30,7 @@ export function createApp(ctx: Ctx, options: { quiet?: boolean } = {}) {
   const app = express();
   app.use(express.json());
   app.use(requestLog(options.quiet ?? false));
+  app.use(sameOriginOnly());
 
   app.get('/healthz', (_req, res) => {
     res.json({ ok: true });
