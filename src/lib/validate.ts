@@ -25,3 +25,10 @@ export function requireAmount(value: unknown, field: string): number {
 export function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
 }
+
+export function requireOneOf<T extends string>(value: unknown, field: string, options: readonly T[]): T {
+  if (typeof value !== 'string' || !(options as readonly string[]).includes(value)) {
+    throw badRequest('invalid_field', `${field} must be one of: ${options.join(', ')}`);
+  }
+  return value as T;
+}

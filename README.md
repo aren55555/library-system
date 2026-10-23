@@ -34,7 +34,7 @@ nvm install 26
 
 ```sh
 npm install
-npm test          # 32 tests, all passing
+npm test          # 34 tests, all passing
 npm start         # http://localhost:3000, seeds sample data on first run
 ```
 
@@ -76,6 +76,18 @@ curl "${DESK[@]}" -X POST localhost:3000/api/admin/clock -d '{"reset":true}'
 ```
 
 You can also start the server at a given time with `FAKE_NOW=2026-03-24T01:30:00Z npm start`. Tests use `FixedClock`; see `test/helpers.ts`.
+
+### Sharing your server
+
+Your interviewer may ask to reach the server you are running. Leave `npm start` running, and in a second terminal run:
+
+```sh
+npm run share
+```
+
+It asks for a passphrase, which your interviewer will tell you, then prints a temporary public address and a QR code for it. Only requests that carry the passphrase get through. Press Ctrl+C to stop sharing.
+
+There is nothing to sign up for or install. The tunnel goes through [localhost.run](https://localhost.run), or [Pinggy](https://pinggy.io) if your network blocks that, using the `ssh` command that comes with macOS, Linux and Windows 10 or newer.
 
 ## Project layout
 

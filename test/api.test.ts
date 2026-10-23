@@ -114,3 +114,42 @@ test('same-origin requests and requests without an origin are allowed', async ()
     .expect(200);
   await request(env.app).get('/api/catalog/search?q=quiet').expect(200);
 });
+
+test('staff can register a patron', async () => {
+  const env = setup();
+  const body = { cardNumber: '22000001', name: 'Ada Lopez', email: 'ada@example.com', cardType: 'child', homeBranch: 'hnl' };
+
+  const res = await request(env.app).post('/api/admin/patrons').set(STAFF).send(body).expect(201);
+  assert.equal(res.body.patron.card_type, 'child');
+  assert.equal(res.body.patron.home_branch_id, env.hnl.id);
+
+  await request(env.app).post('/api/admin/patrons').set(STAFF).send(body).expect(409);
+  await request(env.app).post('/api/admin/patrons').set(STAFF).send({ ...body, cardNumber: '22000002', cardType: 'staff' }).expect(400);
+});
+
+test('staff can add a title with its copies', async () => {
+  const env = setup();
+  const body = {
+    isbn: '9780000009999',
+    title: 'The Tide Clock',
+    author: 'Mira Hale',
+    format: 'book',
+    audience: 'adult',
+    replacementCost: 18.5,
+    copies: [
+      { barcode: '38000001', branch: 'NYC' },
+      { barcode: '38000002', branch: 'SFO' },
+    ],
+  };
+
+  const res = await request(env.app).post('/api/admin/titles').set(STAFF).send(body).expect(201);
+  assert.equal(res.body.copies.length, 2);
+
+  const search = await request(env.app).get('/api/catalog/search?q=9780000009999').expect(200);
+  assert.deepEqual(search.body.results[0].availability, [
+    { branch: 'NYC', available: 1, total: 1 },
+    { branch: 'SFO', available: 1, total: 1 },
+  ]);
+
+  await request(env.app).post('/api/admin/titles').set(STAFF).send(body).expect(409);
+});

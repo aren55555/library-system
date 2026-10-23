@@ -1,6 +1,6 @@
-import { all, one, type Db } from '../db/connection.ts';
-import { notFound } from '../lib/errors.ts';
-import type { Branch, Copy, Patron, Title } from '../types.ts';
+import { all, one, run, type Db } from '../db/connection.ts';
+import { conflict, notFound } from '../lib/errors.ts';
+import type { Branch, CardType, Copy, Patron, Title } from '../types.ts';
 
 export function findPatronByCard(db: Db, cardNumber: string): Patron | undefined {
   return one<Patron>(db, 'SELECT * FROM patrons WHERE card_number = ?', cardNumber);
@@ -50,4 +50,29 @@ export function getCopyByBarcode(db: Db, barcode: string): Copy {
   const copy = one<Copy>(db, 'SELECT * FROM copies WHERE barcode = ?', barcode);
   if (!copy) throw notFound('copy_not_found', `No copy with barcode ${barcode}`);
   return copy;
+}
+
+export interface NewPatron {
+  cardNumber: string;
+  name: string;
+  email: string;
+  cardType: CardType;
+  homeBranch: Branch;
+}
+
+export function createPatron(db: Db, patron: NewPatron, createdAt: Date): Patron {
+  if (findPatronByCard(db, patron.cardNumber)) {
+    throw conflict('duplicate_card', `Card ${patron.cardNumber} is already registered`);
+  }
+  const { id } = run(
+    db,
+    'INSERT INTO patrons (card_number, name, email, card_type, home_branch_id, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    patron.cardNumber,
+    patron.name,
+    patron.email,
+    patron.cardType,
+    patron.homeBranch.id,
+    createdAt.toISOString(),
+  );
+  return getPatron(db, id);
 }
